@@ -8,7 +8,7 @@ type Dependencies struct {
 }
 
 func NewDependencies(ctx context.Context, cfg Config) (*Dependencies, error) {
-	rmq, err := NewRabbitMQ(ctx, cfg)
+	rmq, err := NewRabbitMQ(ctx, cfg.ConnectionURL(), cfg.Exchange, cfg.Prefetch)
 	if err != nil {
 		return nil, err
 	}

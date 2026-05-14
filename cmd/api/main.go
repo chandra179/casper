@@ -11,7 +11,7 @@ import (
 	"casper/modules/api"
 	"casper/modules/task"
 
-	"github.com/Chandra179/gosdk/logger"
+	"casper/internal/logger"
 )
 
 func main() {

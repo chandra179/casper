@@ -7,7 +7,7 @@ import (
 
 	"casper/middleware"
 
-	"github.com/Chandra179/gosdk/logger"
+	"casper/internal/logger"
 )
 
 type Dependencies struct {

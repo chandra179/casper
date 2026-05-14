@@ -19,14 +19,15 @@ const (
 type RabbitMQ struct {
 	conn     *amqp.Connection
 	channel  *amqp.Channel
-	cfg      Config
+	url      string
+	prefetch int
 	notifyCh chan *amqp.Error
 	mu       sync.Mutex
 	closed   bool
 }
 
-func NewRabbitMQ(ctx context.Context, cfg Config) (*RabbitMQ, error) {
-	conn, err := amqp.Dial(cfg.URL)
+func NewRabbitMQ(ctx context.Context, url string, exchange string, prefetch int) (*RabbitMQ, error) {
+	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, fmt.Errorf("amqp.Dial: %w", err)
 	}
@@ -37,7 +38,7 @@ func NewRabbitMQ(ctx context.Context, cfg Config) (*RabbitMQ, error) {
 		return nil, fmt.Errorf("conn.Channel: %w", err)
 	}
 
-	if err := ch.Qos(cfg.Prefetch, 0, false); err != nil {
+	if err := ch.Qos(prefetch, 0, false); err != nil {
 		ch.Close()
 		conn.Close()
 		return nil, fmt.Errorf("ch.Qos: %w", err)
@@ -46,7 +47,8 @@ func NewRabbitMQ(ctx context.Context, cfg Config) (*RabbitMQ, error) {
 	rmq := &RabbitMQ{
 		conn:     conn,
 		channel:  ch,
-		cfg:      cfg,
+		url:      url,
+		prefetch: prefetch,
 		notifyCh: conn.NotifyClose(make(chan *amqp.Error, 1)),
 	}
 

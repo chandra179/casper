@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/Chandra179/gosdk/logger"
+	"casper/internal/logger"
 )
 
 func (d *Dependencies) Recovery() Middleware {

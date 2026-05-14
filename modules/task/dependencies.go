@@ -13,12 +13,7 @@ type Dependencies struct {
 }
 
 func NewDependencies(ctx context.Context, cfg PostgresConfig) (*Dependencies, error) {
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, cfg.SSLMode,
-	)
-
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := pgxpool.New(ctx, cfg.ConnectionString())
 	if err != nil {
 		return nil, fmt.Errorf("pgxpool.New: %w", err)
 	}

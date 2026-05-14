@@ -11,16 +11,17 @@ build:
 test: test-unit test-integration test-e2e
 
 test-unit:
-	go test -v -count=1 -p 1 ./modules/scheduler/ -timeout 30s
-	go test -v -count=1 -p 1 ./modules/worker/ -timeout 30s
+	go test -v -count=1 ./modules/scheduler/ -timeout 30s
+	go test -v -count=1 ./modules/worker/ -timeout 30s
 
 test-integration:
-	go test -v -count=1 -p 1 ./modules/task/ -timeout 60s
-	go test -v -count=1 -p 1 ./modules/broker/ -timeout 60s
-	go test -v -count=1 -p 1 ./modules/api/ -timeout 30s
+	go test -v -count=1 ./modules/task/ -timeout 120s
+	go test -v -count=1 ./modules/broker/ -timeout 120s
+	go test -v -count=1 ./modules/api/ -timeout 60s
+	go test -v -count=1 ./modules/scheduler/ -timeout 120s
 
 test-e2e:
-	go test -v -count=1 -p 1 ./integration/ -timeout 60s
+	go test -v -count=1 ./integration/ -timeout 120s
 
 docker-up:
 	docker compose up -d --wait

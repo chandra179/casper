@@ -19,6 +19,7 @@ type TaskConfig struct {
 }
 
 type PostgresConfig struct {
+	URI      string `yaml:"uri"`
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	User     string `yaml:"user"`
@@ -28,9 +29,10 @@ type PostgresConfig struct {
 }
 
 type BrokerConfig struct {
-	URL       string `yaml:"url"`
-	Exchange  string `yaml:"exchange"`
-	Prefetch  int    `yaml:"prefetch"`
+	URI      string `yaml:"uri"`
+	URL      string `yaml:"url"`
+	Exchange string `yaml:"exchange"`
+	Prefetch int    `yaml:"prefetch"`
 }
 
 type SchedulerConfig struct {

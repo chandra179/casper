@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Chandra179/gosdk/logger"
+	"casper/internal/logger"
 
 	"casper/middleware"
 )

@@ -290,6 +290,62 @@ func TestWorkerHandlerFailure(t *testing.T) {
 	}
 }
 
+func TestWorkerMaxRetriesDeadLetter(t *testing.T) {
+	store := newMockStore()
+	brk := newMockBroker()
+
+	taskID := uuid.New()
+	t1 := &taskmod.Task{
+		ID:         taskID,
+		TaskType:   "doomed_task",
+		TenantID:   "t1",
+		Payload:    []byte(`{}`),
+		Status:     taskmod.StatusInProgress,
+		Version:    1,
+		MaxRetries: 1,
+		RetryCount: 1,
+	}
+	store.addTask(t1)
+
+	handler := func(ctx context.Context, taskType string, payload []byte) error {
+		return &testError{"fatal error"}
+	}
+
+	w := worker.NewWithInterfaces(
+		worker.Config{Concurrency: 1, QueueName: "test"},
+		store,
+		brk,
+	)
+	w.RegisterHandler("doomed_task", handler)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = w.Run(ctx) }()
+
+	brk.sendDelivery(amqp.Delivery{
+		DeliveryTag: 1,
+		Body:        []byte(`{}`),
+		Headers: amqp.Table{
+			"task_id":   taskID.String(),
+			"task_type": "doomed_task",
+		},
+	})
+
+	time.Sleep(200 * time.Millisecond)
+	w.Stop()
+
+	store.mu.Lock()
+	tsk := store.tasks[taskID]
+	store.mu.Unlock()
+
+	if tsk == nil {
+		t.Fatal("task disappeared")
+	}
+	if tsk.Status != taskmod.StatusDeadLettered {
+		t.Errorf("status: want DEAD_LETTERED, got %s", tsk.Status)
+	}
+}
+
 type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }

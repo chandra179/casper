@@ -2,41 +2,29 @@ package broker_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
-
+	"casper/internal/testhelper"
 	"casper/modules/broker"
 )
-
-func testConfig() broker.Config {
-	url := os.Getenv("CASPER_BROKER_URL")
-	if url == "" {
-		url = "amqp://casper:casper@localhost:5672/"
-	}
-	return broker.Config{
-		URL:      url,
-		Exchange: "tasks",
-		Prefetch: 10,
-	}
-}
 
 func setupBroker(t *testing.T) (*broker.RabbitMQ, func()) {
 	t.Helper()
 
-	cfg := testConfig()
+	rmq := testhelper.SetupRabbitMQ(t)
+	cfg := broker.Config{
+		URI:      rmq.URI,
+		Exchange: "tasks",
+		Prefetch: 10,
+	}
+
 	deps, err := broker.NewDependencies(context.Background(), cfg)
 	if err != nil {
-		t.Skipf("rabbitmq not available, skipping integration test: %v", err)
+		t.Fatalf("NewDependencies: %v", err)
 	}
 
-	cleanup := func() {
-		deps.Close()
-	}
-
-	return deps.Broker, cleanup
+	return deps.Broker, deps.Close
 }
 
 func TestPublishAndConsume(t *testing.T) {
@@ -86,15 +74,13 @@ func TestNackRequeue(t *testing.T) {
 		t.Fatalf("Consume: %v", err)
 	}
 
-	var d amqp.Delivery
 	select {
-	case d = <-deliveries:
+	case d := <-deliveries:
+		if err := rmq.Nack(d.DeliveryTag, true); err != nil {
+			t.Fatalf("Nack: %v", err)
+		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for first delivery")
-	}
-
-	if err := rmq.Nack(d.DeliveryTag, true); err != nil {
-		t.Fatalf("Nack: %v", err)
 	}
 
 	select {
