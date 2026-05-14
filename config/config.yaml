@@ -1,13 +1,28 @@
-order:
-  http:
-    addr: ":8080"
-    read_timeout: 5s
-    write_timeout: 35s
-    idle_timeout: 120s
-  grpc:
-    addr: ":9090"
+task:
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "casper"
+    password: "casper"
+    database: "casper"
+    sslmode: "disable"
 
-middleware:
-  timeout: 30s
-  logger:
-    level: dev  # dev | prod
+broker:
+  url: "amqp://casper:casper@localhost:5672/"
+  exchange: "tasks"
+  prefetch: 10
+
+scheduler:
+  poll_interval_ms: 1000
+  batch_size: 50
+  jitter_max_ms: 5000
+
+worker:
+  concurrency: 5
+  queue_name: "tasks.high"
+
+api:
+  port: "8080"
+  read_timeout_in_second: 5
+  write_timeout_in_second: 35
+  idle_timeout_in_second: 120
