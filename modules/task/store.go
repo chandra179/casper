@@ -156,7 +156,6 @@ func (s *Store) Complete(ctx context.Context, id uuid.UUID, version int64) error
 
 func (s *Store) Fail(ctx context.Context, id uuid.UUID, version int64, errMsg string) error {
 	now := time.Now()
-	var newStatus string
 	ct, err := s.pool.Exec(ctx, `
 		UPDATE tasks
 		SET status = CASE WHEN retry_count + 1 >= max_retries THEN 'DEAD_LETTERED' ELSE 'PENDING' END,
@@ -168,7 +167,6 @@ func (s *Store) Fail(ctx context.Context, id uuid.UUID, version int64, errMsg st
 		    version = version + 1
 		WHERE id = $3 AND version = $4
 	`, errMsg, now, id, version)
-	_ = newStatus
 	if err != nil {
 		return fmt.Errorf("fail task: %w", err)
 	}
@@ -199,6 +197,39 @@ func (s *Store) IsProcessed(ctx context.Context, taskID uuid.UUID) (bool, error)
 		return false, fmt.Errorf("check processed: %w", err)
 	}
 	return exists, nil
+}
+
+func (s *Store) ReapStale(ctx context.Context, claimedBefore time.Time, batchSize int) (int, error) {
+	ct, err := s.pool.Exec(ctx, `
+		UPDATE tasks
+		SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL, updated_at = NOW(), version = version + 1
+		WHERE id IN (
+			SELECT id FROM tasks
+			WHERE status = 'IN_PROGRESS' AND claimed_at < $1
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+	`, claimedBefore, batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("reap stale: %w", err)
+	}
+	return int(ct.RowsAffected()), nil
+}
+
+func (s *Store) ResetTask(ctx context.Context, id uuid.UUID, version int64) error {
+	ct, err := s.pool.Exec(ctx, `
+		UPDATE tasks
+		SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL,
+		    version = version + 1, updated_at = NOW()
+		WHERE id = $1 AND version = $2 AND status = 'IN_PROGRESS'
+	`, id, version)
+	if err != nil {
+		return fmt.Errorf("reset task: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("task %s version mismatch or not IN_PROGRESS", id)
+	}
+	return nil
 }
 
 func (s *Store) Ping(ctx context.Context) error {

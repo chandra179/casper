@@ -52,10 +52,15 @@ func main() {
 
 	schedDeps := scheduler.NewDependencies(
 		scheduler.Config{
-			PollInterval: time.Duration(cfg.Scheduler.PollIntervalMs) * time.Millisecond,
-			BatchSize:    cfg.Scheduler.BatchSize,
-			JitterMax:    time.Duration(cfg.Scheduler.JitterMaxMs) * time.Millisecond,
+			PollInterval:         time.Duration(cfg.Scheduler.PollIntervalMs) * time.Millisecond,
+			BatchSize:            cfg.Scheduler.BatchSize,
+			JitterMax:            time.Duration(cfg.Scheduler.JitterMaxMs) * time.Millisecond,
+			VisibilityTimeout:    time.Duration(cfg.Scheduler.VisibilityTimeoutMs) * time.Millisecond,
+			CleanupInterval:      time.Duration(cfg.Scheduler.CleanupIntervalMs) * time.Millisecond,
+			ShutdownDrainTimeout: time.Duration(cfg.Scheduler.ShutdownDrainTimeoutMs) * time.Millisecond,
+			CleanupBatchSize:     100,
 		},
+		taskDeps.Pool,
 		taskDeps.Store,
 		brokerDeps.Broker,
 	)

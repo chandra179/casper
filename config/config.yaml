@@ -16,6 +16,9 @@ scheduler:
   poll_interval_ms: 1000
   batch_size: 50
   jitter_max_ms: 5000
+  visibility_timeout_ms: 300000
+  cleanup_interval_ms: 30000
+  shutdown_drain_timeout_ms: 10000
 
 worker:
   concurrency: 5

@@ -88,8 +88,10 @@ func TestE2EFullFlow(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	schedDeps := scheduler.NewDependencies(
-		scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 0},
-		taskDeps.Store, brokerDeps.Broker,
+		scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 0,
+			VisibilityTimeout: 5 * time.Minute, CleanupInterval: 30 * time.Second,
+			ShutdownDrainTimeout: 10 * time.Second, CleanupBatchSize: 100},
+		taskDeps.Pool, taskDeps.Store, brokerDeps.Broker,
 	)
 	s := scheduler.New(schedDeps)
 	go func() { _ = s.Run(ctx) }()
@@ -177,8 +179,10 @@ func TestE2EConcurrentClaims(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			schedDeps := scheduler.NewDependencies(
-				scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 10 * time.Millisecond},
-				taskDeps.Store, brokerDeps.Broker,
+				scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 10 * time.Millisecond,
+					VisibilityTimeout: 5 * time.Minute, CleanupInterval: 30 * time.Second,
+					ShutdownDrainTimeout: 10 * time.Second, CleanupBatchSize: 100},
+				taskDeps.Pool, taskDeps.Store, brokerDeps.Broker,
 			)
 			s := scheduler.New(schedDeps)
 			runCtx, runCancel := context.WithTimeout(ctx, 5*time.Second)

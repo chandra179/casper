@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"casper/modules/broker"
 	"casper/modules/task"
 )
@@ -23,6 +25,9 @@ type Scheduler struct {
 	cfg       Config
 	claimer   TaskClaimer
 	publisher TaskPublisher
+	pool      *pgxpool.Pool
+	resetter  TaskResetter
+	cleaner   TaskCleaner
 	cancel    context.CancelFunc
 }
 
@@ -31,6 +36,9 @@ func New(deps *Dependencies) *Scheduler {
 		cfg:       deps.Config,
 		claimer:   deps.Store,
 		publisher: deps.Broker,
+		pool:      deps.Pool,
+		resetter:  deps.Store,
+		cleaner:   deps.Store,
 	}
 }
 
@@ -45,6 +53,8 @@ func NewWithInterfaces(cfg Config, claimer TaskClaimer, publisher TaskPublisher)
 func (s *Scheduler) Run(ctx context.Context) error {
 	ctx, s.cancel = context.WithCancel(ctx)
 	defer s.cancel()
+
+	go s.runCleanup(ctx)
 
 	backoff := time.Duration(0)
 	maxBackoff := s.cfg.PollInterval * 10
@@ -84,9 +94,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 		backoff = 0
 
-		for _, t := range claimed {
+		for i, t := range claimed {
 			select {
 			case <-ctx.Done():
+				s.drainRemaining(ctx, claimed[i:])
 				return ctx.Err()
 			default:
 			}
@@ -96,23 +107,27 @@ func (s *Scheduler) Run(ctx context.Context) error {
 				time.Sleep(jitter)
 			}
 
-			routingKey := priorityRoutingKey(t.Priority)
-
-			headers := map[string]interface{}{
-				"task_id":    t.ID.String(),
-				"task_type":  t.TaskType,
-				"tenant_id":  t.TenantID,
-				"priority":   t.Priority,
-				"version":    t.Version,
-			}
-
-			priority := intPriority(t.Priority)
-
-			if err := s.publisher.Publish(ctx, routingKey, t.Payload, priority, headers); err != nil {
+			if err := s.publishTask(ctx, t); err != nil {
 				return fmt.Errorf("publish task %s: %w", t.ID, err)
 			}
 		}
 	}
+}
+
+func (s *Scheduler) publishTask(ctx context.Context, t *task.Task) error {
+	routingKey := priorityRoutingKey(t.Priority)
+
+	headers := map[string]interface{}{
+		"task_id":   t.ID.String(),
+		"task_type": t.TaskType,
+		"tenant_id": t.TenantID,
+		"priority":  t.Priority,
+		"version":   t.Version,
+	}
+
+	priority := intPriority(t.Priority)
+
+	return s.publisher.Publish(ctx, routingKey, t.Payload, priority, headers)
 }
 
 func (s *Scheduler) Stop() {

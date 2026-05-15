@@ -273,3 +273,158 @@ Makefile
 config/config.go
 config/config.yaml
 ```
+
+---
+
+## Post-MVP: Production Hardening Roadmap
+
+The MVP proves the core flow (API → DB → Scheduler → Broker → Worker → DB). These phases harden the system for production deployments.
+
+---
+
+### Phase 7: Reliability — Visibility Timeout & Graceful Shutdown
+
+**Goal:** Tasks never stuck `IN_PROGRESS` after crashes; no lost tasks on deploy.
+
+#### 7a. Visibility Timeout Cleanup Singleton
+
+- [ ] `modules/scheduler/cleanup.go` — cleanup leader election + scan loop
+  - Leader election via `INSERT INTO leader_election ... ON CONFLICT DO UPDATE WHERE expires_at < NOW()` (or advisory locks)
+  - Periodically scan tasks where `status = 'IN_PROGRESS' AND claimed_at < now() - visibility_timeout`
+  - Reset stuck tasks to `PENDING`, clear `claimed_by`/`claimed_at`
+  - Renew lease every N seconds; skip if not leader
+  - Config: `visibility_timeout` (default 5m), `cleanup_interval` (default 30s), `lease_ttl` (default 30s)
+- [ ] `migrations/002_leader_election.sql` — `leader_election` table
+- [ ] `modules/scheduler/cleanup_test.go` — unit tests (mock store)
+  - Stale IN_PROGRESS task → reset to PENDING
+  - Recently claimed task → NOT reset
+  - Single leader elected; non-leader skips scan
+
+#### 7b. Graceful Shutdown Drain Buffer
+
+- [ ] `modules/scheduler/shutdown.go` — SIGTERM handler
+  - Stop polling immediately
+  - Drain claimed-but-undispatched tasks to broker (deadline: 10s)
+  - On deadline expiry, release undispatched tasks back to PENDING via atomic UPDATE
+  - Release advisory locks; close DB/broker connections cleanly
+- [ ] `modules/scheduler/shutdown_test.go` — unit tests
+  - Drains buffer within deadline
+  - Releases tasks on timeout
+- [ ] `cmd/scheduler/main.go` — wire signal handler
+
+---
+
+### Phase 8: Observability — Metrics & Monitoring
+
+**Goal:** Prometheus metrics exported, alerting rules defined.
+
+- [ ] `modules/metrics/metrics.go` — Prometheus metrics struct
+  - `tasks_claimed_per_second` (counter, by tenant/priority)
+  - `tasks_dispatched_per_second` (counter, by tenant/priority)
+  - `tasks_completed_per_second` / `tasks_failed_per_second` (counter)
+  - `p95_execution_latency` (histogram)
+  - `pending_queue_depth` (gauge, by tenant)
+  - `dead_lettered_tasks` (counter)
+  - `visibility_timeout_recoveries` (counter)
+  - `cleanup_leader_elected` (gauge, 0/1)
+- [ ] `modules/metrics/http.go` — `/metrics` endpoint on a separate port
+- [ ] Wire metrics into scheduler/worker/api modules
+- [ ] `deploy/alerts.yml` — Prometheus alerting rules from README alert table
+- [ ] `modules/metrics/metrics_test.go` — unit tests
+
+---
+
+### Phase 9: Fairness — Priority Aging & Weighted Fair Queuing
+
+**Goal:** Low-priority tasks never starve; long-waiting tasks get promoted.
+
+#### 9a. Priority Aging
+
+- [ ] `modules/scheduler/aging.go` — age-bonus computation
+  - Compute `effective_priority = base_priority + age_bonus(now - scheduled_at)`
+  - Config: `age_bonus_per_hour` (how much priority increments per hour of waiting)
+  - Poll query sorts by effective priority instead of raw priority
+- [ ] `modules/scheduler/aging_test.go` — unit tests
+  - Task waiting 24h has higher effective priority than fresh high-priority task
+  - No age bonus when `age_bonus_per_hour = 0`
+
+#### 9b. Weighted Fair Queuing
+
+- [ ] `modules/worker/pool.go` — per-priority worker pools
+  - Configurable worker allocation per priority (e.g. high: 60%, medium: 30%, low: 10%)
+  - Separate goroutine pools per priority level
+  - Config: `priority_weights` map
+- [ ] `modules/worker/pool_test.go` — unit tests
+  - Low-priority tasks always get at least the configured share
+
+---
+
+### Phase 10: Multi-Tenancy — Circuit Breakers
+
+**Goal:** One tenant's failure storm doesn't affect others.
+
+- [ ] `modules/scheduler/circuit.go` — per-tenant circuit breaker
+  - Track failure rate per tenant (sliding window)
+  - If failure rate > threshold (e.g. 90%) for duration (e.g. 5 min) → open circuit → skip dispatch for that tenant
+  - Half-open: dispatch one task to probe recovery; if it succeeds → close; if it fails → back to open
+  - Config: `failure_threshold`, `circuit_open_duration`, `half_open_probe_count`
+- [ ] `modules/scheduler/circuit_test.go` — unit tests
+  - Circuit opens on sustained failures
+  - Circuit half-opens after timeout; closes on success; re-opens on failure
+
+---
+
+### Phase 11: Security — mTLS
+
+**Goal:** All inter-service communication encrypted and authenticated.
+
+- [ ] `modules/security/tls.go` — TLS config loader
+  - Load CA cert, server cert, client cert from files
+  - `tls.Config` for PostgreSQL, RabbitMQ, HTTP clients/servers
+- [ ] Wire mTLS into all connections:
+  - `modules/broker/rabbitmq.go` — TLS dial config
+  - `modules/task/store.go` — PostgreSQL TLS connection
+  - `modules/api/http.go` — HTTPS listener with client cert verification
+- [ ] `modules/security/tls_test.go` — unit tests
+- [ ] `deploy/certs/` — placeholder for cert generation scripts
+
+---
+
+### Phase 12: Scale — Partitioning
+
+**Goal:** Handle 100K+ pending tasks across 50+ scheduler nodes without poll contention.
+
+#### 12a. Hash-Based Partition Polling
+
+- [ ] `modules/scheduler/partition.go` — partition assignment
+  - `partition_key = hash(task_id) % N` assigned on task creation
+  - Poll query: `WHERE partition_key IN (assigned_range) AND status = 'PENDING'`
+  - Dynamic partition ownership via DB table (`partition_ownership`)
+  - On startup: claim unowned partitions; on shutdown: release
+- [ ] `migrations/003_partition_support.sql` — `partition_ownership` table, `partition_key` index
+
+#### 12b. Database Partitioning (pg_partman)
+
+- [ ] `migrations/004_pg_partman.sql` — `pg_partman` setup, auto-create partitions
+- [ ] `docker-compose.yml` — add `pg_partman` extension setup
+- [ ] Archiving script (`scripts/archive_partitions.sh`) — detach old partitions
+
+#### Tests
+
+- [ ] `modules/scheduler/partition_test.go` — unit tests
+  - Partition assignment on startup
+  - Reassignment on node failure
+  - Poll restricted to assigned partitions
+
+---
+
+### Ordering Rationale
+
+| Phase | Why this order |
+|-------|---------------|
+| 7 (Reliability) | Crashes lose tasks — must fix before any production use |
+| 8 (Observability) | Can't debug what you can't see |
+| 9 (Fairness) | Starvation becomes noticeable once real workloads hit |
+| 10 (Circuit Breakers) | Blast-radius isolation before onboarding more tenants |
+| 11 (Security) | mTLS is a deployment concern; can layer on after core is stable |
+| 12 (Scale) | Partitioning only matters at 100K+ pending / 50+ nodes — defer until needed |

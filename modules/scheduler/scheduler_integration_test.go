@@ -68,8 +68,10 @@ func TestSchedulerIntegration(t *testing.T) {
 	}
 
 	schedDeps := scheduler.NewDependencies(
-		scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 0},
-		taskDeps.Store, brokerDeps.Broker,
+		scheduler.Config{PollInterval: 50 * time.Millisecond, BatchSize: 10, JitterMax: 0,
+			VisibilityTimeout: 5 * time.Minute, CleanupInterval: 30 * time.Second,
+			ShutdownDrainTimeout: 10 * time.Second, CleanupBatchSize: 100},
+		taskDeps.Pool, taskDeps.Store, brokerDeps.Broker,
 	)
 	s := scheduler.New(schedDeps)
 

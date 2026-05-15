@@ -208,13 +208,9 @@ func (r *RabbitMQ) Close() {
 }
 
 func (r *RabbitMQ) PurgeQueue(queueName string) (int, error) {
-	q, err := r.channel.QueueInspect(queueName)
-	if err != nil {
-		return 0, err
-	}
 	purged, err := r.channel.QueuePurge(queueName, false)
 	if err != nil {
 		return 0, err
 	}
-	return q.Messages - purged, nil
+	return purged, nil
 }

@@ -36,9 +36,12 @@ type BrokerConfig struct {
 }
 
 type SchedulerConfig struct {
-	PollIntervalMs int `yaml:"poll_interval_ms"`
-	BatchSize      int `yaml:"batch_size"`
-	JitterMaxMs    int `yaml:"jitter_max_ms"`
+	PollIntervalMs          int `yaml:"poll_interval_ms"`
+	BatchSize               int `yaml:"batch_size"`
+	JitterMaxMs             int `yaml:"jitter_max_ms"`
+	VisibilityTimeoutMs     int `yaml:"visibility_timeout_ms"`
+	CleanupIntervalMs       int `yaml:"cleanup_interval_ms"`
+	ShutdownDrainTimeoutMs  int `yaml:"shutdown_drain_timeout_ms"`
 }
 
 type WorkerConfig struct {

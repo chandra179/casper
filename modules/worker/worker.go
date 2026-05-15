@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	taskmod "casper/modules/task"
 	brmod "casper/modules/broker"
+	taskmod "casper/modules/task"
 )
 
 type TaskHandler func(ctx context.Context, taskType string, payload []byte) error
@@ -158,5 +158,6 @@ func (w *Worker) processMessage(ctx context.Context, d amqp.Delivery, workerID s
 
 // Ensure *taskmod.Store implements TaskStore
 var _ TaskStore = (*taskmod.Store)(nil)
+
 // Ensure *brmod.RabbitMQ implements MessageBroker
 var _ MessageBroker = (*brmod.RabbitMQ)(nil)

@@ -123,7 +123,6 @@ The cleanup singleton uses advisory locks to ensure only one node runs the visib
 
 ***
 
-\
 Poll and Claim Loop
 
 **The flow (no code):**
