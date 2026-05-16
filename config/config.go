@@ -37,13 +37,23 @@ type BrokerConfig struct {
 }
 
 type SchedulerConfig struct {
+	PollIntervalMs          int                  `yaml:"poll_interval_ms"`
+	BatchSize               int                  `yaml:"batch_size"`
+	JitterMaxMs             int                  `yaml:"jitter_max_ms"`
+	VisibilityTimeoutMs     int                  `yaml:"visibility_timeout_ms"`
+	CleanupIntervalMs       int                  `yaml:"cleanup_interval_ms"`
+	ShutdownDrainTimeoutMs  int                  `yaml:"shutdown_drain_timeout_ms"`
+	AgeBonusPerHour         float64              `yaml:"age_bonus_per_hour"`
+	CircuitBreaker          CircuitBreakerConfig `yaml:"circuit_breaker"`
+}
+
+type CircuitBreakerConfig struct {
+	FailureThreshold        float64 `yaml:"failure_threshold"`
+	FailureWindowSeconds    int     `yaml:"failure_window_seconds"`
+	CircuitOpenDurationMs   int     `yaml:"circuit_open_duration_ms"`
+	HalfOpenProbeCount      int     `yaml:"half_open_probe_count"`
+	MinimumNumberOfCalls    int     `yaml:"minimum_number_of_calls"`
 	PollIntervalMs          int     `yaml:"poll_interval_ms"`
-	BatchSize               int     `yaml:"batch_size"`
-	JitterMaxMs             int     `yaml:"jitter_max_ms"`
-	VisibilityTimeoutMs     int     `yaml:"visibility_timeout_ms"`
-	CleanupIntervalMs       int     `yaml:"cleanup_interval_ms"`
-	ShutdownDrainTimeoutMs  int     `yaml:"shutdown_drain_timeout_ms"`
-	AgeBonusPerHour         float64 `yaml:"age_bonus_per_hour"`
 }
 
 type WorkerConfig struct {

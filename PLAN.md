@@ -32,7 +32,6 @@ Worker loop: Consume → INSERT processed_tasks (dedup) → Execute handler → 
 ### What's Deferred
 
 - Partitioning (pg_partman, hash-based partition polling)
-- Circuit breakers per tenant
 - Priority aging
 - Weighted fair queuing
 - mTLS
@@ -255,6 +254,8 @@ modules/scheduler/shutdown.go
 modules/scheduler/shutdown_test.go
 modules/scheduler/aging.go
 modules/scheduler/aging_test.go
+modules/scheduler/circuit.go
+modules/scheduler/circuit_test.go
 modules/metrics/metrics.go
 modules/metrics/http.go
 modules/metrics/metrics_test.go
@@ -370,12 +371,12 @@ The MVP proves the core flow (API → DB → Scheduler → Broker → Worker →
 
 **Goal:** One tenant's failure storm doesn't affect others.
 
-- [ ] `modules/scheduler/circuit.go` — per-tenant circuit breaker
+- [x] `modules/scheduler/circuit.go` — per-tenant circuit breaker
   - Track failure rate per tenant (sliding window)
   - If failure rate > threshold (e.g. 90%) for duration (e.g. 5 min) → open circuit → skip dispatch for that tenant
   - Half-open: dispatch one task to probe recovery; if it succeeds → close; if it fails → back to open
   - Config: `failure_threshold`, `circuit_open_duration`, `half_open_probe_count`
-- [ ] `modules/scheduler/circuit_test.go` — unit tests
+- [x] `modules/scheduler/circuit_test.go` — unit tests
   - Circuit opens on sustained failures
   - Circuit half-opens after timeout; closes on success; re-opens on failure
 

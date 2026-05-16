@@ -11,4 +11,5 @@ type Config struct {
 	ShutdownDrainTimeout time.Duration
 	CleanupBatchSize     int
 	AgeBonusPerHour      float64
+	CircuitBreaker       CircuitBreakerConfig
 }

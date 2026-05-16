@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -23,23 +24,25 @@ type TaskPublisher interface {
 }
 
 type Scheduler struct {
-	cfg       Config
-	claimer   TaskClaimer
-	publisher TaskPublisher
-	pool      *pgxpool.Pool
-	resetter  TaskResetter
-	cleaner   TaskCleaner
-	cancel    context.CancelFunc
+	cfg            Config
+	claimer        TaskClaimer
+	publisher      TaskPublisher
+	pool           *pgxpool.Pool
+	resetter       TaskResetter
+	cleaner        TaskCleaner
+	circuitBreaker *CircuitBreaker
+	cancel         context.CancelFunc
 }
 
 func New(deps *Dependencies) *Scheduler {
 	return &Scheduler{
-		cfg:       deps.Config,
-		claimer:   deps.Store,
-		publisher: deps.Broker,
-		pool:      deps.Pool,
-		resetter:  deps.Store,
-		cleaner:   deps.Store,
+		cfg:            deps.Config,
+		claimer:        deps.Store,
+		publisher:      deps.Broker,
+		pool:           deps.Pool,
+		resetter:       deps.Store,
+		cleaner:        deps.Store,
+		circuitBreaker: NewCircuitBreaker(deps.Config.CircuitBreaker, deps.Pool),
 	}
 }
 
@@ -58,6 +61,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	go s.runCleanup(ctx)
 
 	go s.runPendingDepthUpdater(ctx)
+
+	if s.circuitBreaker != nil {
+		s.circuitBreaker.Start(ctx)
+	}
 
 	backoff := time.Duration(0)
 	maxBackoff := s.cfg.PollInterval * 10
@@ -107,6 +114,13 @@ func (s *Scheduler) Run(ctx context.Context) error {
 				s.drainRemaining(ctx, claimed[i:])
 				return ctx.Err()
 			default:
+			}
+
+			if s.circuitBreaker != nil && !s.circuitBreaker.Allow(t.TenantID) {
+				if err := s.resetter.ResetTask(ctx, t.ID, t.Version); err != nil {
+					log.Printf("circuit breaker: failed to reset task %s for tenant %s: %v", t.ID, t.TenantID, err)
+				}
+				continue
 			}
 
 			if s.cfg.JitterMax > 0 {

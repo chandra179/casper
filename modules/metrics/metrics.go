@@ -24,6 +24,8 @@ type Metrics struct {
 	PendingQueueDepth            *prometheus.GaugeVec
 	VisibilityTimeoutRecoveries  prometheus.Counter
 	CleanupLeaderElected         prometheus.Gauge
+	CircuitBreakerState          *prometheus.GaugeVec
+	CircuitBreakerTransitions    *prometheus.CounterVec
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -99,6 +101,22 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 				Help:      "Indicates whether this instance is the elected cleanup leader (1 = leader, 0 = not leader).",
 			},
 		),
+		CircuitBreakerState: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "circuit_breaker_state",
+				Help:      "State of the circuit breaker per tenant (0 = closed, 1 = open, 2 = half-open).",
+			},
+			[]string{LabelTenantID},
+		),
+		CircuitBreakerTransitions: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "circuit_breaker_transitions_total",
+				Help:      "Total number of circuit breaker state transitions per tenant.",
+			},
+			[]string{LabelTenantID, "from_state", "to_state"},
+		),
 	}
 
 	reg.MustRegister(
@@ -111,6 +129,8 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		m.PendingQueueDepth,
 		m.VisibilityTimeoutRecoveries,
 		m.CleanupLeaderElected,
+		m.CircuitBreakerState,
+		m.CircuitBreakerTransitions,
 	)
 
 	return m
@@ -156,4 +176,12 @@ func SetCleanupLeaderElected(elected bool) {
 
 func SetPendingQueueDepth(tenantID string, depth float64) {
 	Default.PendingQueueDepth.WithLabelValues(tenantID).Set(depth)
+}
+
+func SetCircuitBreakerState(tenantID string, state float64) {
+	Default.CircuitBreakerState.WithLabelValues(tenantID).Set(state)
+}
+
+func RecordCircuitBreakerTransition(tenantID, fromState, toState string) {
+	Default.CircuitBreakerTransitions.WithLabelValues(tenantID, fromState, toState).Inc()
 }

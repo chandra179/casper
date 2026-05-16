@@ -34,3 +34,9 @@ type Task struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 }
+
+type TenantOutcome struct {
+	TenantID     string
+	Completed    int
+	DeadLettered int
+}
