@@ -17,7 +17,7 @@ type mockStore struct {
 	tasks []*task.Task
 }
 
-func (m *mockStore) Claim(ctx context.Context, claimedBy string, batchSize int) ([]*task.Task, error) {
+func (m *mockStore) Claim(ctx context.Context, claimedBy string, batchSize int, ageBonusPerHour float64) ([]*task.Task, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

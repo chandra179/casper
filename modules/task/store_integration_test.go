@@ -165,7 +165,7 @@ func TestClaim(t *testing.T) {
 		}
 	}
 
-	claimed, err := store.Claim(ctx, "scheduler-1", 3)
+	claimed, err := store.Claim(ctx, "scheduler-1", 3, 0.0)
 	if err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestClaim(t *testing.T) {
 		}
 	}
 
-	remaining, err := store.Claim(ctx, "scheduler-1", 5)
+	remaining, err := store.Claim(ctx, "scheduler-1", 5, 0.0)
 	if err != nil {
 		t.Fatalf("Claim remaining: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestConcurrentClaim(t *testing.T) {
 		wg.Add(1)
 		go func(schedulerID string) {
 			defer wg.Done()
-			claimed, err := store.Claim(ctx, schedulerID, 10)
+			claimed, err := store.Claim(ctx, schedulerID, 10, 0.0)
 			if err != nil {
 				errCh <- err
 				return
@@ -277,7 +277,7 @@ func TestCompleteAndFail(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	claimed, err := store.Claim(ctx, "scheduler-1", 1)
+	claimed, err := store.Claim(ctx, "scheduler-1", 1, 0.0)
 	if err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestCompleteAndFail(t *testing.T) {
 		t.Fatalf("Create tsk2: %v", err)
 	}
 
-	claimed2, _ := store.Claim(ctx, "scheduler-1", 1)
+	claimed2, _ := store.Claim(ctx, "scheduler-1", 1, 0.0)
 	if len(claimed2) != 1 {
 		t.Fatal("expected 1 claimed for tsk2")
 	}
@@ -329,7 +329,7 @@ func TestCompleteAndFail(t *testing.T) {
 		t.Errorf("retry_count: want 1, got %d", got2.RetryCount)
 	}
 
-	claimed2b, _ := store.Claim(ctx, "scheduler-1", 1)
+	claimed2b, _ := store.Claim(ctx, "scheduler-1", 1, 0.0)
 	if len(claimed2b) != 1 {
 		t.Fatal("expected 1 claimed for retry")
 	}

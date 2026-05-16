@@ -249,11 +249,22 @@ modules/scheduler/dependencies.go
 modules/scheduler/scheduler.go
 modules/scheduler/scheduler_test.go
 modules/scheduler/scheduler_integration_test.go
+modules/scheduler/cleanup.go
+modules/scheduler/cleanup_test.go
+modules/scheduler/shutdown.go
+modules/scheduler/shutdown_test.go
+modules/scheduler/aging.go
+modules/scheduler/aging_test.go
+modules/metrics/metrics.go
+modules/metrics/http.go
+modules/metrics/metrics_test.go
 modules/worker/config.go
 modules/worker/dependencies.go
 modules/worker/worker.go
 modules/worker/worker_test.go
 modules/worker/worker_integration_test.go
+modules/worker/pool.go
+modules/worker/pool_test.go
 modules/api/config.go
 modules/api/dependencies.go
 modules/api/http.go
@@ -336,21 +347,21 @@ The MVP proves the core flow (API → DB → Scheduler → Broker → Worker →
 
 #### 9a. Priority Aging
 
-- [ ] `modules/scheduler/aging.go` — age-bonus computation
+- [x] `modules/scheduler/aging.go` — age-bonus computation
   - Compute `effective_priority = base_priority + age_bonus(now - scheduled_at)`
   - Config: `age_bonus_per_hour` (how much priority increments per hour of waiting)
   - Poll query sorts by effective priority instead of raw priority
-- [ ] `modules/scheduler/aging_test.go` — unit tests
+- [x] `modules/scheduler/aging_test.go` — unit tests
   - Task waiting 24h has higher effective priority than fresh high-priority task
   - No age bonus when `age_bonus_per_hour = 0`
 
 #### 9b. Weighted Fair Queuing
 
-- [ ] `modules/worker/pool.go` — per-priority worker pools
+- [x] `modules/worker/pool.go` — per-priority worker pools
   - Configurable worker allocation per priority (e.g. high: 60%, medium: 30%, low: 10%)
   - Separate goroutine pools per priority level
   - Config: `priority_weights` map
-- [ ] `modules/worker/pool_test.go` — unit tests
+- [x] `modules/worker/pool_test.go` — unit tests
   - Low-priority tasks always get at least the configured share
 
 ---

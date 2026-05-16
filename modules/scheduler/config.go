@@ -10,4 +10,5 @@ type Config struct {
 	CleanupInterval      time.Duration
 	ShutdownDrainTimeout time.Duration
 	CleanupBatchSize     int
+	AgeBonusPerHour      float64
 }

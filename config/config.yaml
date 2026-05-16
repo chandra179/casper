@@ -19,10 +19,15 @@ scheduler:
   visibility_timeout_ms: 300000
   cleanup_interval_ms: 30000
   shutdown_drain_timeout_ms: 10000
+  age_bonus_per_hour: 0.0
 
 worker:
   concurrency: 5
   queue_name: "tasks.high"
+  priority_weights:
+    high: 60
+    medium: 30
+    low: 10
 
 api:
   port: "8080"

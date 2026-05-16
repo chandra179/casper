@@ -37,17 +37,19 @@ type BrokerConfig struct {
 }
 
 type SchedulerConfig struct {
-	PollIntervalMs          int `yaml:"poll_interval_ms"`
-	BatchSize               int `yaml:"batch_size"`
-	JitterMaxMs             int `yaml:"jitter_max_ms"`
-	VisibilityTimeoutMs     int `yaml:"visibility_timeout_ms"`
-	CleanupIntervalMs       int `yaml:"cleanup_interval_ms"`
-	ShutdownDrainTimeoutMs  int `yaml:"shutdown_drain_timeout_ms"`
+	PollIntervalMs          int     `yaml:"poll_interval_ms"`
+	BatchSize               int     `yaml:"batch_size"`
+	JitterMaxMs             int     `yaml:"jitter_max_ms"`
+	VisibilityTimeoutMs     int     `yaml:"visibility_timeout_ms"`
+	CleanupIntervalMs       int     `yaml:"cleanup_interval_ms"`
+	ShutdownDrainTimeoutMs  int     `yaml:"shutdown_drain_timeout_ms"`
+	AgeBonusPerHour         float64 `yaml:"age_bonus_per_hour"`
 }
 
 type WorkerConfig struct {
-	Concurrency int    `yaml:"concurrency"`
-	QueueName   string `yaml:"queue_name"`
+	Concurrency     int            `yaml:"concurrency"`
+	QueueName       string         `yaml:"queue_name"`
+	PriorityWeights map[string]int `yaml:"priority_weights"`
 }
 
 type APIConfig struct {

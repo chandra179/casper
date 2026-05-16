@@ -63,7 +63,7 @@ func (s *Store) GetByID(ctx context.Context, id uuid.UUID) (*Task, error) {
 	return &t, nil
 }
 
-func (s *Store) Claim(ctx context.Context, claimedBy string, batchSize int) ([]*Task, error) {
+func (s *Store) Claim(ctx context.Context, claimedBy string, batchSize int, ageBonusPerHour float64) ([]*Task, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -75,10 +75,10 @@ func (s *Store) Claim(ctx context.Context, claimedBy string, batchSize int) ([]*
 		       max_retries, retry_count, version, created_at, updated_at
 		FROM tasks
 		WHERE status = 'PENDING' AND scheduled_at <= NOW()
-		ORDER BY priority DESC, scheduled_at ASC
+		ORDER BY (priority + FLOOR(EXTRACT(EPOCH FROM (NOW() - scheduled_at)) / 3600.0 * $2)) DESC, scheduled_at ASC
 		LIMIT $1
 		FOR UPDATE SKIP LOCKED
-	`, batchSize)
+	`, batchSize, ageBonusPerHour)
 	if err != nil {
 		return nil, fmt.Errorf("select pending: %w", err)
 	}

@@ -101,43 +101,50 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) processMessage(ctx context.Context, d amqp.Delivery, workerID string) {
+	processMessage(ctx, d, workerID, w.store, w.broker, w.handlers, &w.mu)
+}
+
+func processMessage(ctx context.Context, d amqp.Delivery, workerID string,
+	store TaskStore, broker MessageBroker,
+	handlers map[string]TaskHandler, mu *sync.RWMutex) {
+
 	taskIDStr, _ := d.Headers["task_id"].(string)
 	taskType, _ := d.Headers["task_type"].(string)
 
 	if taskIDStr == "" {
-		_ = w.broker.Ack(d.DeliveryTag)
+		_ = broker.Ack(d.DeliveryTag)
 		return
 	}
 
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
-		_ = w.broker.Ack(d.DeliveryTag)
+		_ = broker.Ack(d.DeliveryTag)
 		return
 	}
 
-	isNew, err := w.store.MarkProcessed(ctx, taskID, workerID)
+	isNew, err := store.MarkProcessed(ctx, taskID, workerID)
 	if err != nil {
-		_ = w.broker.Nack(d.DeliveryTag, true)
+		_ = broker.Nack(d.DeliveryTag, true)
 		return
 	}
 	if !isNew {
-		_ = w.broker.Ack(d.DeliveryTag)
+		_ = broker.Ack(d.DeliveryTag)
 		return
 	}
 
-	tsk, err := w.store.GetByID(ctx, taskID)
+	tsk, err := store.GetByID(ctx, taskID)
 	if err != nil || tsk == nil {
-		_ = w.broker.Ack(d.DeliveryTag)
+		_ = broker.Ack(d.DeliveryTag)
 		return
 	}
 
-	w.mu.RLock()
-	handler, ok := w.handlers[taskType]
-	w.mu.RUnlock()
+	mu.RLock()
+	handler, ok := handlers[taskType]
+	mu.RUnlock()
 
 	if !ok {
-		_ = w.store.Complete(ctx, taskID, tsk.Version)
-		_ = w.broker.Ack(d.DeliveryTag)
+		_ = store.Complete(ctx, taskID, tsk.Version)
+		_ = broker.Ack(d.DeliveryTag)
 		metrics.RecordTaskCompleted(tsk.TenantID, taskType)
 		return
 	}
@@ -147,22 +154,22 @@ func (w *Worker) processMessage(ctx context.Context, d amqp.Delivery, workerID s
 	metrics.ObserveExecutionDuration(tsk.TenantID, taskType, time.Since(start).Seconds())
 
 	if err != nil {
-		if failErr := w.store.Fail(ctx, taskID, tsk.Version, err.Error()); failErr != nil {
-			_ = w.broker.Nack(d.DeliveryTag, true)
+		if failErr := store.Fail(ctx, taskID, tsk.Version, err.Error()); failErr != nil {
+			_ = broker.Nack(d.DeliveryTag, true)
 			return
 		}
 		metrics.RecordTaskFailed(tsk.TenantID, taskType)
 		metrics.RecordDeadLettered(tsk.TenantID, taskType)
-		_ = w.broker.Nack(d.DeliveryTag, false)
+		_ = broker.Nack(d.DeliveryTag, false)
 		return
 	}
 
-	if err := w.store.Complete(ctx, taskID, tsk.Version); err != nil {
-		_ = w.broker.Nack(d.DeliveryTag, true)
+	if err := store.Complete(ctx, taskID, tsk.Version); err != nil {
+		_ = broker.Nack(d.DeliveryTag, true)
 		return
 	}
 
-	_ = w.broker.Ack(d.DeliveryTag)
+	_ = broker.Ack(d.DeliveryTag)
 	metrics.RecordTaskCompleted(tsk.TenantID, taskType)
 }
 

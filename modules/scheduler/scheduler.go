@@ -15,7 +15,7 @@ import (
 )
 
 type TaskClaimer interface {
-	Claim(ctx context.Context, claimedBy string, batchSize int) ([]*task.Task, error)
+	Claim(ctx context.Context, claimedBy string, batchSize int, ageBonusPerHour float64) ([]*task.Task, error)
 }
 
 type TaskPublisher interface {
@@ -71,7 +71,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		default:
 		}
 
-		claimed, err := s.claimer.Claim(ctx, instanceID, s.cfg.BatchSize)
+		claimed, err := s.claimer.Claim(ctx, instanceID, s.cfg.BatchSize, s.cfg.AgeBonusPerHour)
 		if err != nil {
 			return fmt.Errorf("claim: %w", err)
 		}

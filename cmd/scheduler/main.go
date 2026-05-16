@@ -60,6 +60,7 @@ func main() {
 			CleanupInterval:      time.Duration(cfg.Scheduler.CleanupIntervalMs) * time.Millisecond,
 			ShutdownDrainTimeout: time.Duration(cfg.Scheduler.ShutdownDrainTimeoutMs) * time.Millisecond,
 			CleanupBatchSize:     100,
+			AgeBonusPerHour:      cfg.Scheduler.AgeBonusPerHour,
 		},
 		taskDeps.Pool,
 		taskDeps.Store,
