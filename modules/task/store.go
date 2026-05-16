@@ -25,8 +25,8 @@ func (s *Store) Create(ctx context.Context, t *Task) error {
 	if t.Status == "" {
 		t.Status = StatusPending
 	}
-	t.CreatedAt = time.Now()
-	t.UpdatedAt = time.Now()
+	t.CreatedAt = time.Now().UTC()
+	t.UpdatedAt = time.Now().UTC()
 
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO tasks (id, task_type, tenant_id, payload, status, priority, scheduled_at, max_retries, retry_count, version, created_at, updated_at)

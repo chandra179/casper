@@ -1,0 +1,76 @@
+groups:
+  - name: casper_alerts
+    rules:
+      - alert: NoTasksProcessed
+        expr: rate(casper_tasks_claimed_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No tasks have been claimed by any scheduler for 5 minutes."
+          description: "The scheduler cluster may be down or unable to connect to PostgreSQL. Investigate scheduler health immediately."
+
+      - alert: DeadLetterQueueGrowing
+        expr: rate(casper_dead_lettered_tasks_total[10m]) * 60 > 10
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "More than 10 tasks per minute are being dead-lettered."
+          description: "Task handlers are failing at a high rate. Check worker logs for handler errors and queue {{ $labels.queue }}."
+
+      - alert: TaskExecutionLatencyHigh
+        expr: histogram_quantile(0.95, rate(casper_task_execution_duration_seconds_bucket[15m])) > 30
+        for: 15m
+        labels:
+          severity: high
+        annotations:
+          summary: "P95 task execution latency exceeds 30 seconds."
+          description: "Task handlers for tenant={{ $labels.tenant_id }} task_type={{ $labels.task_type }} are taking more than 30 seconds (p95). Investigate handler performance or downstream dependency latency."
+
+      - alert: PendingQueueBacklogGrowing
+        expr: deriv(casper_pending_queue_depth[15m]) > 500
+        for: 15m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Pending queue is growing faster than 500 tasks per minute."
+          description: "The pending queue for tenant={{ $labels.tenant_id }} is accumulating. Check scheduler throughput and worker capacity."
+
+      - alert: CleanupLeaderNotElected
+        expr: max(casper_cleanup_leader_elected) == 0
+        for: 2m
+        labels:
+          severity: medium
+        annotations:
+          summary: "No cleanup leader has been elected for 2 minutes."
+          description: "Without a cleanup leader, tasks stuck IN_PROGRESS will not be recovered. Verify scheduler instances are running and can acquire advisory locks."
+
+      - alert: VisibilityTimeoutRecoveriesActive
+        expr: rate(casper_visibility_timeout_recoveries_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Tasks are being recovered by visibility timeout cleanup."
+          description: "Sustained recovery of stuck IN_PROGRESS tasks indicates worker or scheduler crashes. Check instance stability."
+
+  - name: casper_alerts_per_tenant
+    rules:
+      - alert: NoTasksProcessedPerTenant
+        expr: rate(casper_tasks_claimed_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "No tasks claimed for tenant {{ $labels.tenant_id }} in 10 minutes."
+          description: "Tenant {{ $labels.tenant_id }} may have a circuit breaker open or no pending tasks. Verify tenant health."
+
+      - alert: DeadLetterQueueGrowingPerTenant
+        expr: rate(casper_dead_lettered_tasks_total[10m]) * 60 > 10
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "High dead-letter rate for tenant {{ $labels.tenant_id }}."
+          description: "More than 10 dead-lettered tasks per minute for tenant={{ $labels.tenant_id }} task_type={{ $labels.task_type }}. Check handler logs for this tenant."

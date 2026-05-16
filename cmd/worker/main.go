@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"casper/config"
 	"casper/modules/broker"
+	"casper/modules/metrics"
 	"casper/modules/task"
 	"casper/modules/worker"
 )
@@ -59,6 +61,9 @@ func main() {
 	)
 
 	w := worker.New(workerDeps)
+
+	port, _ := strconv.Atoi(cfg.Metrics.Port)
+	metrics.StartMetricsServer(":" + strconv.Itoa(port+1))
 
 	// Register a default handler that logs and succeeds.
 	w.RegisterHandler("*", func(ctx context.Context, taskType string, payload []byte) error {

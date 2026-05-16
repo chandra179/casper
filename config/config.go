@@ -12,6 +12,7 @@ type Config struct {
 	Scheduler SchedulerConfig `yaml:"scheduler"`
 	Worker    WorkerConfig    `yaml:"worker"`
 	API       APIConfig       `yaml:"api"`
+	Metrics   MetricsConfig   `yaml:"metrics"`
 }
 
 type TaskConfig struct {
@@ -54,6 +55,10 @@ type APIConfig struct {
 	ReadTimeoutInSec  int    `yaml:"read_timeout_in_second"`
 	WriteTimeoutInSec int    `yaml:"write_timeout_in_second"`
 	IdleTimeoutInSec  int    `yaml:"idle_timeout_in_second"`
+}
+
+type MetricsConfig struct {
+	Port string `yaml:"port"`
 }
 
 func Load(path string) (*Config, error) {

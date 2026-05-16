@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"casper/modules/broker"
+	"casper/modules/metrics"
 	"casper/modules/task"
 )
 
@@ -56,6 +57,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 	go s.runCleanup(ctx)
 
+	go s.runPendingDepthUpdater(ctx)
+
 	backoff := time.Duration(0)
 	maxBackoff := s.cfg.PollInterval * 10
 
@@ -94,6 +97,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 		backoff = 0
 
+		for _, t := range claimed {
+			metrics.RecordTaskClaimed(t.TenantID, t.Priority)
+		}
+
 		for i, t := range claimed {
 			select {
 			case <-ctx.Done():
@@ -127,7 +134,11 @@ func (s *Scheduler) publishTask(ctx context.Context, t *task.Task) error {
 
 	priority := intPriority(t.Priority)
 
-	return s.publisher.Publish(ctx, routingKey, t.Payload, priority, headers)
+	if err := s.publisher.Publish(ctx, routingKey, t.Payload, priority, headers); err != nil {
+		return err
+	}
+	metrics.RecordTaskDispatched(t.TenantID, t.Priority)
+	return nil
 }
 
 func (s *Scheduler) Stop() {
@@ -154,4 +165,39 @@ func intPriority(priority int) uint8 {
 		return 0
 	}
 	return uint8(priority)
+}
+
+func (s *Scheduler) runPendingDepthUpdater(ctx context.Context) {
+	if s.pool == nil {
+		return
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.updatePendingDepth(ctx)
+		}
+	}
+}
+
+func (s *Scheduler) updatePendingDepth(ctx context.Context) {
+	rows, err := s.pool.Query(ctx, `SELECT tenant_id, COUNT(*) FROM tasks WHERE status = 'PENDING' GROUP BY tenant_id`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tenantID string
+		var count int
+		if err := rows.Scan(&tenantID, &count); err != nil {
+			continue
+		}
+		metrics.SetPendingQueueDepth(tenantID, float64(count))
+	}
 }

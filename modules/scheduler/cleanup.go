@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"casper/modules/metrics"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,9 +43,12 @@ func (s *Scheduler) tryBecomeCleanupLeader(ctx context.Context) {
 		return
 	}
 	if !locked {
+		metrics.SetCleanupLeaderElected(false)
 		return
 	}
+	metrics.SetCleanupLeaderElected(true)
 	defer func() {
+		metrics.SetCleanupLeaderElected(false)
 		if _, err := conn.Exec(context.Background(), "SELECT pg_advisory_unlock(hashtext('cleanup_leader'))"); err != nil {
 			log.Printf("cleanup: advisory_unlock: %v", err)
 		}
@@ -66,6 +71,7 @@ func (s *Scheduler) reapLoop(ctx context.Context, conn *pgxpool.Conn) {
 		}
 		if n > 0 {
 			log.Printf("cleanup: reaped %d stale tasks", n)
+			metrics.RecordVisibilityTimeoutRecoveries(float64(n))
 		}
 
 		select {

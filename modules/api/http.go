@@ -93,7 +93,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		req.Priority = 0
 	}
 
-	scheduledAt := time.Now()
+	scheduledAt := time.Now().UTC()
 	if req.ScheduledAt != nil {
 		scheduledAt = *req.ScheduledAt
 	}

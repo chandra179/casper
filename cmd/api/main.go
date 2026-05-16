@@ -4,11 +4,13 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"casper/config"
 	"casper/middleware"
 	"casper/modules/api"
+	"casper/modules/metrics"
 	"casper/modules/task"
 
 	"casper/internal/logger"
@@ -52,6 +54,9 @@ func main() {
 
 	logger := logger.NewLogger("dev")
 	mwDeps := middleware.NewDependencies(logger)
+
+	port, _ := strconv.Atoi(cfg.Metrics.Port)
+	metrics.StartMetricsServer(":" + strconv.Itoa(port+2))
 
 	log.Printf("API server starting on port %s", cfg.API.Port)
 	if err := api.RunHTTPServer(apiDeps, mwDeps); err != nil {

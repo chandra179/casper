@@ -29,3 +29,6 @@ api:
   read_timeout_in_second: 5
   write_timeout_in_second: 35
   idle_timeout_in_second: 120
+
+metrics:
+  port: "9090"

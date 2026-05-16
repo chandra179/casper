@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	brmod "casper/modules/broker"
+	"casper/modules/metrics"
 	taskmod "casper/modules/task"
 )
 
@@ -136,14 +138,21 @@ func (w *Worker) processMessage(ctx context.Context, d amqp.Delivery, workerID s
 	if !ok {
 		_ = w.store.Complete(ctx, taskID, tsk.Version)
 		_ = w.broker.Ack(d.DeliveryTag)
+		metrics.RecordTaskCompleted(tsk.TenantID, taskType)
 		return
 	}
 
-	if err := handler(ctx, taskType, d.Body); err != nil {
+	start := time.Now()
+	err = handler(ctx, taskType, d.Body)
+	metrics.ObserveExecutionDuration(tsk.TenantID, taskType, time.Since(start).Seconds())
+
+	if err != nil {
 		if failErr := w.store.Fail(ctx, taskID, tsk.Version, err.Error()); failErr != nil {
 			_ = w.broker.Nack(d.DeliveryTag, true)
 			return
 		}
+		metrics.RecordTaskFailed(tsk.TenantID, taskType)
+		metrics.RecordDeadLettered(tsk.TenantID, taskType)
 		_ = w.broker.Nack(d.DeliveryTag, false)
 		return
 	}
@@ -154,6 +163,7 @@ func (w *Worker) processMessage(ctx context.Context, d amqp.Delivery, workerID s
 	}
 
 	_ = w.broker.Ack(d.DeliveryTag)
+	metrics.RecordTaskCompleted(tsk.TenantID, taskType)
 }
 
 // Ensure *taskmod.Store implements TaskStore

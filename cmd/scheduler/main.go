@@ -10,6 +10,7 @@ import (
 
 	"casper/config"
 	"casper/modules/broker"
+	"casper/modules/metrics"
 	"casper/modules/scheduler"
 	"casper/modules/task"
 )
@@ -66,6 +67,8 @@ func main() {
 	)
 
 	sched := scheduler.New(schedDeps)
+
+	metrics.StartMetricsServer(":" + cfg.Metrics.Port)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

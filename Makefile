@@ -11,6 +11,7 @@ build:
 test: test-unit test-integration test-e2e
 
 test-unit:
+	go test -v -count=1 ./modules/metrics/ -timeout 30s
 	go test -v -count=1 ./modules/scheduler/ -timeout 30s
 	go test -v -count=1 ./modules/worker/ -timeout 30s
 
